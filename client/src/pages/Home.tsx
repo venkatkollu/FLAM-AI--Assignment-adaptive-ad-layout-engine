@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpRight,
   Bell,
@@ -81,6 +81,10 @@ export default function Home() {
   const [showGrid, setShowGrid] = useState(false);
   const [previewMode, setPreviewMode] = useState<"fit" | "actual">("fit");
   const [zoom, setZoom] = useState(72);
+  const [displayType, setDisplayType] = useState("DM Sans / 700");
+  const [cornerRadius, setCornerRadius] = useState("24 px / Soft");
+  const [showInspectorMenu, setShowInspectorMenu] = useState(false);
+  const campaignInputRef = useRef<HTMLInputElement>(null);
 
   const surface = surfaces.find((item) => item.id === activeSurface) ?? surfaces[0];
   const compositionLabel = useMemo(() => {
@@ -89,6 +93,19 @@ export default function Home() {
     if (activeSurface === "square") return "Portrait crop protected";
     return "Primary composition locked";
   }, [activeSurface]);
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        campaignInputRef.current?.focus();
+        campaignInputRef.current?.select();
+      }
+      if (event.key === "Escape") setShowInspectorMenu(false);
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, []);
 
   const exportSpec = () => {
     const spec = {
@@ -118,6 +135,9 @@ export default function Home() {
     setShowSafeZone(true);
     setShowGrid(false);
     setZoom(72);
+    setDisplayType("DM Sans / 700");
+    setCornerRadius("24 px / Soft");
+    setShowInspectorMenu(false);
     toast("Canvas reset", { description: "Back to the starter composition." });
   };
 
@@ -216,7 +236,7 @@ export default function Home() {
             </div>
 
             <div className={cn("canvas-stage", showGrid && "show-grid")}>
-              <div className={cn("ad-preview", `surface-${activeSurface}`, previewMode === "actual" && "actual-preview")} style={{ "--accent": accent } as React.CSSProperties}>
+              <div className={cn("ad-preview", `surface-${activeSurface}`, previewMode === "actual" && "actual-preview")} style={{ "--accent": accent, "--zoom": zoom / 72, "--radius": cornerRadius.startsWith("16") ? "16px" : cornerRadius.startsWith("32") ? "32px" : "24px", "--display-font": displayType.startsWith("Space") ? "'Space Grotesk', sans-serif" : "'DM Sans', sans-serif" } as React.CSSProperties}>
                 <div className="ad-grain" />
                 <div className="ad-orbit orbit-one" />
                 <div className="ad-orbit orbit-two" />
@@ -234,16 +254,16 @@ export default function Home() {
               </div>
               <div className="stage-caption"><span>{compositionLabel}</span><span>⌘ + drag to reposition</span></div>
             </div>
-            <div className="zoom-control"><span>Zoom</span><input aria-label="Preview zoom" type="range" min="40" max="100" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} /><strong>{zoom}%</strong></div>
+            <div className="zoom-control"><span>Zoom</span><input aria-label="Preview zoom" type="range" min="40" max="100" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} /><strong>{zoom}%</strong><button className="zoom-reset" onClick={() => setZoom(72)} aria-label="Reset zoom">Reset</button></div>
           </div>
 
           <aside className="inspector">
-            <div className="inspector-heading"><div><span className="section-index">02</span><h2>Composition</h2></div><button className="more-button" aria-label="More composition options"><MoreHorizontal size={17} /></button></div>
+            <div className="inspector-heading"><div><span className="section-index">02</span><h2>Composition</h2></div><div className="inspector-menu-wrap"><button className="more-button" aria-label="More composition options" onClick={() => setShowInspectorMenu(!showInspectorMenu)}><MoreHorizontal size={17} /></button>{showInspectorMenu && <div className="inspector-menu"><button onClick={() => { setHeadline(starterHeadline); setShowInspectorMenu(false); toast("Headline restored"); }}>Restore headline</button><button onClick={() => { navigator.clipboard?.writeText(JSON.stringify({ campaign, headline, supportingCopy, cta })); setShowInspectorMenu(false); toast.success("Copy spec copied"); }}>Copy copy spec</button></div>}</div></div>
             <p className="inspector-note">Edit the source content. The engine will protect hierarchy as the surface changes.</p>
 
             <div className="inspector-group">
               <label htmlFor="campaign">Campaign name</label>
-              <div className="input-wrap"><input id="campaign" value={campaign} onChange={(event) => setCampaign(event.target.value)} /><span className="input-hint">⌘ K</span></div>
+              <div className="input-wrap"><input ref={campaignInputRef} id="campaign" value={campaign} onChange={(event) => setCampaign(event.target.value)} /><span className="input-hint">⌘ K</span></div>
             </div>
             <div className="inspector-group">
               <div className="label-row"><label htmlFor="headline">Headline</label><span className="character-count">{headline.length}/48</span></div>
@@ -262,8 +282,8 @@ export default function Home() {
             <div className="inspector-divider" />
             <div className="inspector-heading compact"><div><span className="section-index">03</span><h2>Brand tokens</h2></div><button className="text-button" onClick={() => toast("Brand tokens synced from Quietly ahead")}>Sync</button></div>
             <div className="color-row"><div><label>Accent color</label><span className="color-value">{accent.toUpperCase()}</span></div><div className="color-swatches">{colorOptions.map((color) => <button key={color.value} className={cn("color-swatch", accent === color.value && "selected")} style={{ backgroundColor: color.value }} aria-label={`Use ${color.name} accent`} onClick={() => setAccent(color.value)} />)}</div></div>
-            <div className="token-row"><div className="token-icon"><Type size={15} /></div><div><span>Display type</span><strong>DM Sans / 700</strong></div><ChevronDown size={15} className="muted-icon" /></div>
-            <div className="token-row"><div className="token-icon"><Frame size={15} /></div><div><span>Corner radius</span><strong>24 px / Soft</strong></div><ChevronDown size={15} className="muted-icon" /></div>
+            <label className="token-row token-select"><div className="token-icon"><Type size={15} /></div><div><span>Display type</span><strong>{displayType}</strong></div><select aria-label="Display type" value={displayType} onChange={(event) => setDisplayType(event.target.value)}><option>DM Sans / 700</option><option>Space Grotesk / 600</option><option>DM Sans / 600</option></select><ChevronDown size={15} className="muted-icon" /></label>
+            <label className="token-row token-select"><div className="token-icon"><Frame size={15} /></div><div><span>Corner radius</span><strong>{cornerRadius}</strong></div><select aria-label="Corner radius" value={cornerRadius} onChange={(event) => setCornerRadius(event.target.value)}><option>16 px / Tight</option><option>24 px / Soft</option><option>32 px / Round</option></select><ChevronDown size={15} className="muted-icon" /></label>
 
             <div className="inspector-divider" />
             <div className="preflight"><div className="preflight-heading"><span className="status-dot" /><strong>Preflight passed</strong><span>4 / 4</span></div><p>Contrast, safe areas, and text overflow are all within spec.</p><button onClick={() => toast.success("All checks passed", { description: "Your composition is ready for handoff." })}>View checks <ArrowUpRight size={13} /></button></div>
